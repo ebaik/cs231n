@@ -1,6 +1,12 @@
 # ignore data files
+<<<<<<< HEAD
 cifar-10-batches-py/*
 tiny-imagenet-100-A*
 tiny-imagenet-100-B*
 tiny-100-A-pretrained/*
 assignment3/cs231n/datasets/*
+=======
+assignment1/cs231n/datasets/cifar-10-batches-py
+assignment2/cs231n/datasets/cifar-10-batches-py
+assignment3/cs231n/datasets/
+>>>>>>> 7aa52f58d1f167ace7f3471460ed37b14f167077

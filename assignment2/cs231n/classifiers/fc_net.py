@@ -194,29 +194,30 @@ class FullyConnectedNet(object):
     for idx_params, hidden_dim in enumerate(hidden_dims):
         w_str = "W%s" % (idx_params+1)
         b_str = "b%s" % (idx_params+1)
-        gamma_str = "gamma%s" % (idx_params+1)
-        beta_str = "beta%s" % (idx_params+1)
+        if self.use_batchnorm:
+            gamma_str = "gamma%s" % (idx_params+1)
+            beta_str = "beta%s" % (idx_params+1)
         if idx_params == 0:
             self.params[w_str] = weight_scale*np.random.randn(input_dim,hidden_dim)
             self.params[b_str] = np.zeros(hidden_dim)
-            #self.params[gamma_str] = np.ones(input_dim)
-            #%self.params[beta_str] = np.zeros(input_dim)
+            if self.use_batchnorm:
+                self.params[gamma_str] = np.ones(hidden_dim)
+                self.params[beta_str] = np.zeros(hidden_dim)
         else:
             prev_layer = hidden_dims[idx_params-1]
             self.params[w_str] = weight_scale*np.random.randn(prev_layer,hidden_dim)
             self.params[b_str] = np.zeros(hidden_dim)
-            #self.params[gamma_str] = np.ones(hidden_dim)
-            #self.params[beta_str] = np.zeros(hidden_dim)
+            if self.use_batchnorm:
+                self.params[gamma_str] = np.ones(hidden_dim)
+                self.params[beta_str] = np.zeros(hidden_dim)
 
     # last layer after hidden dimensions
     w_str = "W%s" % str(len(hidden_dims)+1)
     b_str = "b%s" % str(len(hidden_dims)+1)
-    gamma_str = "gamma%s" % str(len(hidden_dims)+1)
-    beta_str = "beta%s" % str(len(hidden_dims)+1)
+    #gamma_str = "gamma%s" % str(len(hidden_dims)+1)
+    #beta_str = "beta%s" % str(len(hidden_dims)+1)
     self.params[w_str] = weight_scale*np.random.randn(hidden_dim,num_classes)
     self.params[b_str] = np.zeros(num_classes)
-    # self.params[gamma_str] = np.ones(hidden_dim)
-    # self.params[beta_str] = np.zeros(hidden_dim)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -280,32 +281,52 @@ class FullyConnectedNet(object):
     reg_loss = 0
     cache_affine_history = []
     cache_relu_history = []
+    cache_batchnorm_history = []
+    cache_dropout_history = []
     #print "self.params = ", self.params
     for layer_idx in xrange(self.num_layers):
         w_str, b_str = "W%s" % (layer_idx+1), "b%s" % (layer_idx+1)
-        gamma_str = "gamma%s" % (layer_idx+1)
-        beta_str = "beta%s" % (layer_idx+1)
+
+        if self.use_batchnorm and layer_idx < self.num_layers-1:
+            gamma_str = "gamma%s" % (layer_idx+1)
+            beta_str = "beta%s" % (layer_idx+1)
+            gamma, beta = self.params[gamma_str], self.params[beta_str]
+            bn_param = self.bn_params[layer_idx]
+
         # Unpack variables from the params dictionary
         W, b = self.params[w_str], self.params[b_str]
-        # gamma, beta = self.params[gamma_str], self.params[beta_str]
         reg_loss += 0.5*reg*np.sum(W*W)  # regularization loss
 
         if layer_idx == 0:  # first layer: affine - relu
             scores,cache_scores = affine_forward(X,W,b)
-            out, cache_input = relu_forward(scores)
+            if self.use_batchnorm:
+                bout, bcache_input = batchnorm_forward(scores, gamma, beta, bn_param)
+                cache_batchnorm_history.append(bcache_input)
+                out, cache_input = relu_forward(bout)
+            else:
+                out, cache_input = relu_forward(scores)
+            if self.use_dropout:
+                out, cache_dropout = dropout_forward(out, self.dropout_param)
+                cache_dropout_history.append(cache_dropout)
             cache_affine_history.append(cache_scores)
             cache_relu_history.append(cache_input)
-        elif layer_idx == self.num_layers-1:
-            # last layer: affine - softmax
+        elif layer_idx == self.num_layers-1:   # last layer: affine - softmax
             hidden_layer = out
             scores,cache_scores = affine_forward(hidden_layer,W,b)
             data_loss,dx = softmax_loss(scores,y)
             cache_affine_history.append(cache_scores)
-        else:
-            # all other layers: affine - relu using input from previous layer
+        else:    # all other layers: affine - relu using input from previous layer
             hidden_layer = out
             scores,cache_scores = affine_forward(hidden_layer,W,b)
-            out, cache_input = relu_forward(scores)
+            if self.use_batchnorm:
+                bout, bcache_input = batchnorm_forward(scores,gamma,beta,bn_param)
+                cache_batchnorm_history.append(bcache_input)
+                out, cache_input = relu_forward(bout)
+            else:
+                out, cache_input = relu_forward(scores)
+            if self.use_dropout:
+                out, cache_dropout = dropout_forward(out, self.dropout_param)
+                cache_dropout_history.append(cache_dropout)
             cache_affine_history.append(cache_scores)
             cache_relu_history.append(cache_input)
 
@@ -336,10 +357,18 @@ class FullyConnectedNet(object):
     w_str, b_str = "W%s" % (self.num_layers), "b%s" % (self.num_layers)
     W = cache_affine_history[self.num_layers-1][1]
     grads[w_str], grads[b_str] = dw + reg*W, db
-    
+
     for backprop_idx in xrange(self.num_layers-2,-1,-1):
+        if self.use_dropout:
+            dx = dropout_backward(dx,cache_dropout_history[backprop_idx])
         dx = relu_backward(dx,cache_relu_history[backprop_idx])
-        dx,dw,db = affine_backward(dx,cache_affine_history[backprop_idx])
+        if self.use_batchnorm:
+            dxb, dgamma, dbeta = batchnorm_backward_alt(dx,cache_batchnorm_history[backprop_idx])
+            dx, dw, db = affine_backward(dxb,cache_affine_history[backprop_idx])
+            gamma_str, beta_str = "gamma%s" % (backprop_idx+1), "beta%s" % (backprop_idx+1)
+            grads[gamma_str], grads[beta_str] = dgamma, dbeta
+        else:
+            dx,dw,db = affine_backward(dx,cache_affine_history[backprop_idx])
         w_str, b_str = "W%s" % (backprop_idx+1), "b%s" % (backprop_idx+1)
         W = cache_affine_history[backprop_idx][1]
         grads[w_str], grads[b_str] = dw + reg*W, db
