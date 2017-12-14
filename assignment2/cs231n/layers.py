@@ -472,7 +472,7 @@ def conv_backward_naive(dout, cache):
       db[idx_f] = np.sum(dout[:,idx_f,:,:])
 
   dx = np.zeros(x.shape)
-  
+  for 
 
 
   #############################################################################
