@@ -497,19 +497,16 @@ def max_pool_forward_naive(x, pool_param):
   S = pool_param['stride']
   Hout = (H - Hp) / S + 1
   Wout = (W - Wp) / S + 1
-  out = zeros((N,C,Hout,Wout))
+  out = np.zeros((N,C,Hout,Wout))
   #############################################################################
   # TODO: Implement the max pooling forward pass                              #
   #############################################################################
-  #for idx_n in range(N):
-    #  for idx_c in range(C):
-    #      for idx_i in range(Hout):
-    #          for idx_j in range(Wout):
-                  #index_k =
-                  #index_l =
-                  #x_filter = x[idx_n,idx_c,index_k,index_l]
-                  #max_value = np.amax(x_filter)
-                  #out[idx_n,idx_c,idx_i,idx_j] = max_value
+  for idx_n in range(N):
+      for idx_c in range(C):
+          for idx_i in range(Hout):
+              for idx_j in range(Wout):
+                  out[idx_n,idx_c,idx_i,idx_j] = np.amax(x[idx_n,idx_c,idx_i*S:idx_i*S+Hout,idx_j*S:idx_j*S+Wout])
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -528,11 +525,29 @@ def max_pool_backward_naive(dout, cache):
   Returns:
   - dx: Gradient with respect to x
   """
-  dx = None
+  x, pool_param = cache
+  N, C, H, W = x.shape
+  Hp = pool_param['pool_height']
+  Wp = pool_param['pool_width']
+  S = pool_param['stride']
+  Hout = (H - Hp) / S + 1
+  Wout = (W - Wp) / S + 1
+  dx = np.zeros(x.shape)
   #############################################################################
   # TODO: Implement the max pooling backward pass                             #
   #############################################################################
-  pass
+  for idx_n in range(N):
+      for idx_c in range(C):
+          for idx_i in range(Hout):
+              for idx_j in range(Wout):
+                  # figure out which index to pass backprop
+                  # value through to from max computation graph node
+                  x_temp = x[idx_n,idx_c,idx_i*S:idx_i*S+Hout,idx_j*S:idx_j*S+Wout]
+                  max_val = np.amax(x_temp)
+                  filter_mask = x_temp == max_val
+                  mask = np.zeros_like(x_temp)
+                  mask[filter_mask] = 1.0
+                  dx[idx_n,idx_c,idx_i*S:idx_i*S+Hout,idx_j*S:idx_j*S+Wout] += dout[idx_n,idx_c,idx_i,idx_j] * mask
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
