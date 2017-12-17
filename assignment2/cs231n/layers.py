@@ -380,47 +380,32 @@ def conv_forward_naive(x, w, b, conv_param):
   """
   out = None
   N, C, H, W = x.shape
-  F, Cw, HH, WW = w.shape
-  pad_val = conv_param.get('pad')
-  stride = conv_param.get('stride')
-  if pad_val is not None or pad_val != 0:
-      Hprime = 1 + (H - HH + 2 * pad_val) / stride
-      Wprime = 1 + (W - WW + 2 * pad_val) / stride
-  else:
-      Hprime = 1 + (H - HH) / stride
-      Wprime = 1 + (W - WW) / stride
+  F, _, HH, WW = w.shape
+  pad_val = conv_param.get('pad',0)
+  S = conv_param.get('stride',1)
+  Hout = 1 + (H - HH + 2 * pad_val) / S
+  Wout = 1 + (W - WW + 2 * pad_val) / S
 
   #############################################################################
   # TODO: Implement the convolutional forward pass.                           #
   # Hint: you can use the function np.pad for padding.                        #
   #############################################################################
   # pad the input x if pad parameter set to non-zero value
-  if pad_val is not None or pad_val != 0:
-      x = np.pad(x,((0,0),(0,0),(pad_val,pad_val),(pad_val,pad_val)),'constant',constant_values=0)
+  x_pad = np.pad(x,((0,0),(0,0),(pad_val,pad_val),(pad_val,pad_val)),'constant')
 
   # for loops - index into output as reference point
-  out = np.zeros((N,F,Hprime,Wprime))
-  for idx_input in xrange(N):
-      for idx_out_depth in xrange(F):
-          for idx_Hprime in xrange(Hprime):
-
+  out = np.zeros((N,F,Hout,Wout))
+  for idx_n in xrange(N):
+      for idx_f in xrange(F):
+          for idx_k in xrange(Hout):
               # set start and end indices in H dimension into x
-              if idx_Hprime == 0:
-                  idx_x_H_start = 0
-              else:
-                  idx_x_H_start = idx_x_H_start + stride
-              idx_x_H_end = idx_x_H_start + HH
-
-              for idx_Wprime in xrange(Wprime):
-
+              idx_i_start = idx_k*S
+              idx_i_end = idx_i_start + HH
+              for idx_l in xrange(Wout):
                   # set start and end indices in W dimension into x
-                  if idx_Wprime == 0:
-                      idx_x_W_start = 0
-                  else:
-                      idx_x_W_start = idx_x_W_start + stride
-                  idx_x_W_end = idx_x_W_start + WW
-
-                  out[idx_input,idx_out_depth,idx_Hprime,idx_Wprime] = np.sum(x[idx_input,:,idx_x_H_start:idx_x_H_end,idx_x_W_start:idx_x_W_end] * w[idx_out_depth,:,:,:]) + b[idx_out_depth]
+                  idx_j_start = idx_l*S
+                  idx_j_end = idx_j_start + WW
+                  out[idx_n,idx_f,idx_k,idx_l] = np.sum(x_pad[idx_n,:,idx_i_start:idx_i_end,idx_j_start:idx_j_end] * w[idx_f,:,:,:]) + b[idx_f]
 
 
   #############################################################################
@@ -516,15 +501,15 @@ def max_pool_forward_naive(x, pool_param):
   #############################################################################
   # TODO: Implement the max pooling forward pass                              #
   #############################################################################
-  for idx_n in range(N):
-      for idx_c in range(C):
-          for idx_i in range(Hout):
-              for idx_j in range(Wout):
-                  index_k =
-                  index_l =
-                  x_filter = x[idx_n,idx_c,index_k,index_l]
-                  max_value = np.amax(x_filter)
-                  out[idx_n,idx_c,idx_i,idx_j] = max_value
+  #for idx_n in range(N):
+    #  for idx_c in range(C):
+    #      for idx_i in range(Hout):
+    #          for idx_j in range(Wout):
+                  #index_k =
+                  #index_l =
+                  #x_filter = x[idx_n,idx_c,index_k,index_l]
+                  #max_value = np.amax(x_filter)
+                  #out[idx_n,idx_c,idx_i,idx_j] = max_value
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
