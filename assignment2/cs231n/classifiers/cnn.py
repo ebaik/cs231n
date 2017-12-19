@@ -67,10 +67,27 @@ class ThreeLayerConvNet(object):
     Evaluate loss and gradient for the three-layer convolutional network.
 
     Input / output: Same API as TwoLayerNet in fc_net.py.
+
+    Inputs:
+    - X: Array of input data of shape (N, d_1, ..., d_k)
+    - y: Array of labels, of shape (N,). y[i] gives the label for X[i].
+
+    Returns:
+    If y is None, then run a test-time forward pass of the model and return:
+    - scores: Array of shape (N, C) giving classification scores, where
+    scores[i, c] is the classification score for X[i] and class c.
+
+    If y is not None, then run a training-time forward and backward pass and
+    return a tuple of:
+    - loss: Scalar value giving the loss
+    - grads: Dictionary with the same keys as self.params, mapping parameter
+    names to gradients of the loss with respect to those parameters.
     """
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
     W3, b3 = self.params['W3'], self.params['b3']
+    reg = self.reg
+    N = X.shape[0]
 
     # pass conv_param to the forward pass for the convolutional layer
     filter_size = W1.shape[2]
@@ -105,7 +122,13 @@ class ThreeLayerConvNet(object):
     # data loss using softmax, and make sure that grads[k] holds the gradients #
     # for self.params[k]. Don't forget to add L2 regularization!               #
     ############################################################################
-    pass
+    correct_prob = -np.log(prob[range(N),y])
+    data_loss = np.sum(correct_prob) / N  # average over N samples
+    # data_loss, dscores = softmax_loss(scores,y)
+    reg_loss = 0.5*reg*np.sum(W1*W1) + 0.5*reg*np.sum(W2*W2) + 0.5*reg*np.sum(W3*W3)
+    loss = data_loss + reg_loss
+
+    
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
