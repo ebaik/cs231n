@@ -38,6 +38,15 @@ class ThreeLayerConvNet(object):
     self.dtype = dtype
 
     C, H, W = input_dim
+    Sc = 1  # stride for conv
+    pad = (filter_size - 1) / 2
+    Hc = 1 + (H - filter_size + 2 * pad) / Sc
+    Wc = 1 + (W - filter_size + 2 * pad) / Sc
+    pool_height = 2
+    pool_width = 2
+    Sp = 2  # stride for max pool
+    Hp = 1 + (Hc - pool_height) / 2
+    Wp = 1 + (Wc - pool_width) / 2
     ############################################################################
     # TODO: Initialize weights and biases for the three-layer convolutional    #
     # network. Weights should be initialized from a Gaussian with standard     #
@@ -48,10 +57,20 @@ class ThreeLayerConvNet(object):
     # hidden affine layer, and keys 'W3' and 'b3' for the weights and biases   #
     # of the output affine layer.                                              #
     ############################################################################
+
+    # conv + relu layer
+    # input: (N,C,H,W)
+    # output: (N,num_filters,Hc,Wc)
     self.params['W1'] = weight_scale*np.random.randn(num_filters,C,filter_size,filter_size)
     self.params['b1'] = np.zeros(num_filters)
-    self.params['W2'] = weight_scale*np.random.randn(C*H*W,hidden_dim)
+    # max pool + affine layer
+    # input: (N,num_filters*Hp*Wp)
+    # output: (N,hidden_dim)
+    self.params['W2'] = weight_scale*np.random.randn(num_filters*Hp*Wp,hidden_dim)
     self.params['b2'] = np.zeros(hidden_dim)
+    # affine layer
+    # input: (N,hidden_dim)
+    # output: (N,num_classes)
     self.params['W3'] = weight_scale*np.random.randn(hidden_dim,num_classes)
     self.params['b3'] = np.zeros(num_classes)
     ############################################################################
@@ -122,13 +141,27 @@ class ThreeLayerConvNet(object):
     # data loss using softmax, and make sure that grads[k] holds the gradients #
     # for self.params[k]. Don't forget to add L2 regularization!               #
     ############################################################################
-    correct_prob = -np.log(prob[range(N),y])
+    correct_prob = -np.log(scores[range(N),y])
     data_loss = np.sum(correct_prob) / N  # average over N samples
     # data_loss, dscores = softmax_loss(scores,y)
     reg_loss = 0.5*reg*np.sum(W1*W1) + 0.5*reg*np.sum(W2*W2) + 0.5*reg*np.sum(W3*W3)
     loss = data_loss + reg_loss
 
-    
+    # compute output gradient of softmax for backpropagation
+    dscores = scores
+    dscores[range(N),y] -= 1
+    dscores = dscores / N
+
+    dout3, dW3, db3 = affine_backward(dscores,cache3)
+    dout2, dW2, db2 = affine_relu_backward(dout3,cache2)
+    dout1, dW1, db1 = conv_relu_pool_backward(dout2, cache1)
+
+    grads['W3'] = dW3 + reg*W3   # don't forget regularization gradient
+    grads['b3'] = db3
+    grads['W2'] = dW2 + reg*W2   # don't forget regularization gradient
+    grads['b2'] = db2
+    grads['W1'] = dW1 + reg*W1   # don't forget regularization gradient
+    grads['b1'] = db1
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
