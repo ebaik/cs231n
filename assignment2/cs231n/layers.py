@@ -576,8 +576,9 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
   - out: Output data, of shape (N, C, H, W)
   - cache: Values needed for the backward pass
   """
-  out, cache = None, None
+  N, C, H, W = x.shape
 
+  out, cache = None, None
   #############################################################################
   # TODO: Implement the forward pass for spatial batch normalization.         #
   #                                                                           #
@@ -585,10 +586,15 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
   # version of batch normalization defined above. Your implementation should  #
   # be very short; ours is less than five lines.                              #
   #############################################################################
-  pass
+  xtransform = np.zeros((N*H*W,C))
+  for idx_c in xrange(C):
+      xtransform[:,idx_c] = x[:,idx_c,:,:].reshape((N*H*W,))   # let xtransform be (N*H*W,C)
+  out_temp, cache = batchnorm_forward(xtransform, gamma, beta, bn_param)
+  out = np.transpose(out_temp.reshape(N,H,W,C),(0,3,1,2))  # out is (N,C,H,W)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
+
 
   return out, cache
 
@@ -606,8 +612,9 @@ def spatial_batchnorm_backward(dout, cache):
   - dgamma: Gradient with respect to scale parameter, of shape (C,)
   - dbeta: Gradient with respect to shift parameter, of shape (C,)
   """
-  dx, dgamma, dbeta = None, None, None
 
+  N, C, H, W = dout.shape
+  dx, dgamma, dbeta = None, None, None
   #############################################################################
   # TODO: Implement the backward pass for spatial batch normalization.        #
   #                                                                           #
@@ -615,7 +622,9 @@ def spatial_batchnorm_backward(dout, cache):
   # version of batch normalization defined above. Your implementation should  #
   # be very short; ours is less than five lines.                              #
   #############################################################################
-  pass
+  dout_transform = np.transpose(dout,(0,2,3,1))
+  dxtemp, dgamma, dbeta = batchnorm_backward_alt(dout_transform.reshape((N*H*W,C)), cache)
+  dx = dxtemp.reshape(N,H,W,C).transpose(0,3,1,2)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################

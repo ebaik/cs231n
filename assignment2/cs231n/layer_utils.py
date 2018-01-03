@@ -40,7 +40,7 @@ def conv_relu_forward(x, w, b, conv_param):
   Inputs:
   - x: Input to the convolutional layer
   - w, b, conv_param: Weights and parameters for the convolutional layer
-  
+
   Returns a tuple of:
   - out: Output from the ReLU
   - cache: Object to give to the backward pass
@@ -61,7 +61,7 @@ def conv_relu_backward(dout, cache):
   return dx, dw, db
 
 
-def conv_relu_pool_forward(x, w, b, conv_param, pool_param):
+def conv_relu_pool_forward(x, w, b, batch_param, conv_param, pool_param, use_batchnorm=False):
   """
   Convenience layer that performs a convolution, a ReLU, and a pool.
 
@@ -69,25 +69,32 @@ def conv_relu_pool_forward(x, w, b, conv_param, pool_param):
   - x: Input to the convolutional layer
   - w, b, conv_param: Weights and parameters for the convolutional layer
   - pool_param: Parameters for the pooling layer
+  - use_batchnorm: Whether or not to use batch normalization
 
   Returns a tuple of:
   - out: Output from the pooling layer
   - cache: Object to give to the backward pass
   """
+  gamma = batch_param['gamma']
+  beta = batch_param['beta']
+  batch_cache = None
   a, conv_cache = conv_forward_fast(x, w, b, conv_param)
+  if use_batchnorm:
+      a, batch_cache = spatial_batchnorm_forward(a, gamma, beta, bn_param)
   s, relu_cache = relu_forward(a)
   out, pool_cache = max_pool_forward_fast(s, pool_param)
-  cache = (conv_cache, relu_cache, pool_cache)
+  cache = (conv_cache, relu_cache, pool_cache, batch_cache)
   return out, cache
 
 
-def conv_relu_pool_backward(dout, cache):
+def conv_relu_pool_backward(dout, cache, use_batchnorm=False):
   """
   Backward pass for the conv-relu-pool convenience layer
   """
-  conv_cache, relu_cache, pool_cache = cache
+  conv_cache, relu_cache, pool_cache, batch_cache = cache
   ds = max_pool_backward_fast(dout, pool_cache)
   da = relu_backward(ds, relu_cache)
+  if use_batchnorm:
+      da, dgamma, dbeta = patial_batchnorm_backward(da, batch_cache)
   dx, dw, db = conv_backward_fast(da, conv_cache)
   return dx, dw, db
-
