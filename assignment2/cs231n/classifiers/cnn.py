@@ -35,7 +35,7 @@ class ThreeLayerConvNet(object):
     """
     self.use_batchnorm = use_batchnorm
     self.params = {}
-    self.batch_param = {}
+    self.bn_params = {}
     self.reg = reg
     self.dtype = dtype
 
@@ -60,17 +60,18 @@ class ThreeLayerConvNet(object):
     # of the output affine layer.                                              #
     ############################################################################
 
+    self.bn_params['mode'] = 'train'
     # conv + relu layer
     # input: (N,C,H,W)
     # output: (N,num_filters,Hc,Wc)
     self.params['W1'] = weight_scale*np.random.randn(num_filters,C,filter_size,filter_size)
     self.params['b1'] = np.zeros(num_filters)
     if use_batchnorm:
-        self.batch_param['beta'] = np.random.randn(C)
-        self.batch_param['gamma'] = np.random.randn(C)
+        self.bn_params['beta'] = np.random.randn(C)
+        self.bn_params['gamma'] = np.random.randn(C)
     else:
-        self.batch_param['beta'] = None
-        self.batch_param['gamma'] = None
+        self.bn_params['beta'] = None
+        self.bn_params['gamma'] = None
     # max pool + affine layer
     # input: (N,num_filters*Hp*Wp)
     # output: (N,hidden_dim)
@@ -130,7 +131,7 @@ class ThreeLayerConvNet(object):
     # computing the class scores for X and storing them in the scores          #
     # variable.                                                                #
     ############################################################################
-    out1, cache1 = conv_relu_pool_forward(X, W1, b1, self.batch_param, conv_param, pool_param, use_batchnorm)
+    out1, cache1 = conv_relu_pool_forward(X, W1, b1, self.bn_params, conv_param, pool_param, use_batchnorm)
     out2, cache2 = affine_relu_forward(out1, W2, b2)
     out3, cache3 = affine_forward(out2, W3, b3)
     scores_input = out3 - np.amax(out3,axis=1,keepdims=True) # (N,C)
