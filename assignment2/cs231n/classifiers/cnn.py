@@ -66,12 +66,8 @@ class ThreeLayerConvNet(object):
     # output: (N,num_filters,Hc,Wc)
     self.params['W1'] = weight_scale*np.random.randn(num_filters,C,filter_size,filter_size)
     self.params['b1'] = np.zeros(num_filters)
-    if use_batchnorm:
-        self.bn_params['beta'] = np.random.randn(C)
-        self.bn_params['gamma'] = np.random.randn(C)
-    else:
-        self.bn_params['beta'] = None
-        self.bn_params['gamma'] = None
+    self.params['beta'] = np.zeros(num_filters)
+    self.params['gamma'] = np.ones(num_filters)
     # max pool + affine layer
     # input: (N,num_filters*Hp*Wp)
     # output: (N,hidden_dim)
@@ -114,6 +110,7 @@ class ThreeLayerConvNet(object):
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
     W3, b3 = self.params['W3'], self.params['b3']
+    beta, gamma = self.params['beta'], self.params['gamma']
     reg = self.reg
     N = X.shape[0]
     use_batchnorm = self.use_batchnorm
@@ -125,13 +122,19 @@ class ThreeLayerConvNet(object):
     # pass pool_param to the forward pass for the max-pooling layer
     pool_param = {'pool_height': 2, 'pool_width': 2, 'stride': 2}
 
+    mode = 'test' if y is None else 'train'
+
+    # Set train/test mode for batchnorm params since they
+    # behave differently during training and testing
+    self.bn_params['mode'] = mode
+
     scores = None
     ############################################################################
     # TODO: Implement the forward pass for the three-layer convolutional net,  #
     # computing the class scores for X and storing them in the scores          #
     # variable.                                                                #
     ############################################################################
-    out1, cache1 = conv_relu_pool_forward(X, W1, b1, self.bn_params, conv_param, pool_param, use_batchnorm)
+    out1, cache1 = conv_relu_pool_forward(X, W1, b1, beta, gamma, self.bn_params, conv_param, pool_param, use_batchnorm)
     out2, cache2 = affine_relu_forward(out1, W2, b2)
     out3, cache3 = affine_forward(out2, W3, b3)
     scores_input = out3 - np.amax(out3,axis=1,keepdims=True) # (N,C)
@@ -164,7 +167,7 @@ class ThreeLayerConvNet(object):
 
     dout3, dW3, db3 = affine_backward(dscores,cache3)
     dout2, dW2, db2 = affine_relu_backward(dout3,cache2)
-    dout1, dW1, db1 = conv_relu_pool_backward(dout2, cache1, use_batchnorm)
+    dout1, dW1, db1, dgamma, dbeta = conv_relu_pool_backward(dout2, cache1, use_batchnorm)
 
     grads['W3'] = dW3 + reg*W3   # don't forget regularization gradient
     grads['b3'] = db3
@@ -172,6 +175,8 @@ class ThreeLayerConvNet(object):
     grads['b2'] = db2
     grads['W1'] = dW1 + reg*W1   # don't forget regularization gradient
     grads['b1'] = db1
+    grads['gamma'] = dgamma
+    grads['beta'] = dbeta
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
