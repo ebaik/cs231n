@@ -46,8 +46,8 @@ class ThreeLayerConvNet(object):
     pool_height = 2
     pool_width = 2
     Sp = 2  # stride for max pool
-    Hp = 1 + (Hc - pool_height) / 2
-    Wp = 1 + (Wc - pool_width) / 2
+    Hp = 1 + (Hc - pool_height) / Sp
+    Wp = 1 + (Wc - pool_width) / Sp
 
     # With batch normalization we need to keep track of running means and
     # variances, so we need to pass a special bn_param object to each batch
@@ -55,8 +55,8 @@ class ThreeLayerConvNet(object):
     # of the first batch normalization layer, self.bn_params[1] to the forward
     # pass of the second batch normalization layer, etc.
     self.bn_params = []
-    if self.use_batchnorm:
-      self.bn_params = [{'mode': 'train'} for i in xrange(3)]
+    if use_batchnorm:
+        self.bn_params = [{'mode': 'train'} for i in xrange(3)]
 
     ############################################################################
     # TODO: Initialize weights and biases for the three-layer convolutional    #
@@ -74,22 +74,25 @@ class ThreeLayerConvNet(object):
     # output: (N,num_filters,Hc,Wc)
     self.params['W1'] = weight_scale*np.random.randn(num_filters,C,filter_size,filter_size)
     self.params['b1'] = np.zeros(num_filters)
-    self.params['beta'] = np.zeros(num_filters)
-    self.params['gamma'] = np.ones(num_filters)
+    if use_batchnorm:
+        self.params['beta'] = np.zeros(num_filters)
+        self.params['gamma'] = np.ones(num_filters)
     # max pool + affine layer
     # input: (N,num_filters*Hp*Wp)
     # output: (N,hidden_dim)
     self.params['W2'] = weight_scale*np.random.randn(num_filters*Hp*Wp,hidden_dim)
     self.params['b2'] = np.zeros(hidden_dim)
-    self.params['beta2'] = np.zeros(hidden_dim)
-    self.params['gamma2'] = np.ones(hidden_dim)
+    if use_batchnorm:
+        self.params['beta2'] = np.zeros(hidden_dim)
+        self.params['gamma2'] = np.ones(hidden_dim)
     # affine layer
     # input: (N,hidden_dim)
     # output: (N,num_classes)
     self.params['W3'] = weight_scale*np.random.randn(hidden_dim,num_classes)
     self.params['b3'] = np.zeros(num_classes)
-    self.params['beta3'] = np.zeros(num_classes)
-    self.params['gamma3'] = np.ones(num_classes)
+    if use_batchnorm:
+        self.params['beta3'] = np.zeros(num_classes)
+        self.params['gamma3'] = np.ones(num_classes)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -122,12 +125,13 @@ class ThreeLayerConvNet(object):
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
     W3, b3 = self.params['W3'], self.params['b3']
-    beta, gamma = self.params['beta'], self.params['gamma']
-    beta2, gamma2 = self.params['beta2'], self.params['gamma2']
-    beta3, gamma3 = self.params['beta3'], self.params['gamma3']
     reg = self.reg
     N = X.shape[0]
     use_batchnorm = self.use_batchnorm
+    if use_batchnorm:
+        beta, gamma = self.params['beta'], self.params['gamma']
+        beta2, gamma2 = self.params['beta2'], self.params['gamma2']
+        beta3, gamma3 = self.params['beta3'], self.params['gamma3']
 
     # pass conv_param to the forward pass for the convolutional layer
     filter_size = W1.shape[2]
@@ -141,13 +145,12 @@ class ThreeLayerConvNet(object):
     # Set train/test mode for batchnorm params since they
     # behave differently during training and testing
     if use_batchnorm:
-      for bn_param in self.bn_params:
-        bn_param['mode'] = mode
-
-    # dictionary with batch norm parameters needed for each separate layer
-    bn_param1 = self.bn_params[0]
-    bn_param2 = self.bn_params[1]
-    bn_param3 = self.bn_params[2]
+        for bn_param in self.bn_params:
+            bn_param['mode'] = mode
+        # dictionary with batch norm parameters needed for each separate layer
+        bn_param1 = self.bn_params[0]
+        bn_param2 = self.bn_params[1]
+        bn_param3 = self.bn_params[2]
 
     scores = None
     ############################################################################
@@ -201,7 +204,7 @@ class ThreeLayerConvNet(object):
         dout_rb = relu_backward(dout_ab,cache_rf)
         dout_bb, dgamma_bb, dbeta_bb = batchnorm_backward_alt(dout_rb, cache_bf)
         dout_ab, dW2, db2 = affine_backward(dout_bb,cache_af)
-        dout1, dW1, db1, dgamma, dbeta = conv_batchnorm_relu_pool_backward(dout_ab, cache_crpf, use_batchnorm)
+        dout1, dW1, db1, dgamma, dbeta = conv_batchnorm_relu_pool_backward(dout_ab, cache_crpf)
         # save batchnorm gradients from backpropagation
         grads['gamma'] = dgamma
         grads['gamma2'] = dgamma_bb
@@ -212,7 +215,7 @@ class ThreeLayerConvNet(object):
     else:
         dout_final, dW3, db3 = affine_backward(dscores, cache_final)
         dout_ab, dW2, db2 = affine_relu_backward(dout_final, cache_arf)
-        dout1, dW1, db1, dgamma, dbeta = conv_relu_pool_backward(dout_ab, cache_crpf)
+        dout1, dW1, db1 = conv_relu_pool_backward(dout_ab, cache_crpf)
 
     # save gradients from backpropagation
     grads['W3'] = dW3 + reg*W3   # don't forget regularization gradient
@@ -270,7 +273,8 @@ class ConvNet(object):
     self.reg = reg
     self.dtype = dtype
     self.L = L
-    self.M = len(hidden_dims)
+    M = len(hidden_dims)
+    self.M = M
     self.num_layers = L + 1 + M + 1
     self.conv_params = {}  # to keep track of input data dimension changes by max pooling through conv layers
     self.pool_params = {}  # to keep track of and pass max pool parameters
@@ -281,14 +285,15 @@ class ConvNet(object):
     pad = (filter_size - 1) / 2
     Hc = 1 + (H - filter_size + 2 * pad) / Sc
     Wc = 1 + (W - filter_size + 2 * pad) / Sc
-    pool_height = 2
-    pool_width = 2
-    Sp = 2  # stride for max pool
-    Hp = 1 + (Hc - pool_height) / 2
-    Wp = 1 + (Wc - pool_width) / 2
+    pool_height = 1 #2
+    pool_width = 1 #2
+    Sp = 1 #2  # stride for max pool
+    Hp = 1 + (Hc - pool_height) / Sp
+    Wp = 1 + (Wc - pool_width) / Sp
 
     # for passing conv filter parameters to the forward pass
-    self.conv_params['stride'] = Sc, self.conv_params['pad'] = pad
+    self.conv_params['stride'] = Sc
+    self.conv_params['pad'] = pad
     # for passing pool_param to the forward pass for the max-pooling layer
     self.pool_params = {'pool_height': pool_height, 'pool_width': pool_width, 'stride': Sp}
 
@@ -299,7 +304,7 @@ class ConvNet(object):
     # pass of the second batch normalization layer, etc.
     self.bn_params = []
     if self.use_batchnorm:
-      self.bn_params = [{'mode': 'train'} for i in xrange(L+1+M)]
+        self.bn_params = [{'mode': 'train'} for i in xrange(L+1+M)]
 
     ############################################################################
     # TODO: Initialize weights and biases for the three-layer convolutional    #
@@ -329,7 +334,10 @@ class ConvNet(object):
         Wc_str = "Wc%s" % (idx+1)
         Hp_str = "Hp%s" % (idx+1)
         Wp_str = "Wp%s" % (idx+1)
-        self.params[w_str] = weight_scale*np.random.randn(num_filters,C,filter_size,filter_size)
+        if idx == 0:
+            self.params[w_str] = weight_scale*np.random.randn(num_filters,C,filter_size,filter_size)
+        else:
+            self.params[w_str] = weight_scale*np.random.randn(num_filters,num_filters,filter_size,filter_size)
         self.params[b_str] = np.zeros(num_filters)
         # keep track of changing conv layer input/output dimensions due to max pooling
         if idx == 0:
@@ -344,8 +352,8 @@ class ConvNet(object):
             self.conv_params[W_str] = self.conv_params["Wp%s" % idx]
             self.conv_params[Hc_str] = 1 + (self.conv_params[H_str] - filter_size + 2 * pad) / Sc
             self.conv_params[Wc_str] = 1 + (self.conv_params[W_str] - filter_size + 2 * pad) / Sc
-            self.conv_params[Hp_str] = 1 + (self.conv_params[Hc_str] - pool_height) / 2
-            self.conv_params[Wp_str] = 1 + (self.conv_params[Wc_str] - pool_width) / 2
+            self.conv_params[Hp_str] = 1 + (self.conv_params[Hc_str] - pool_height) / Sp
+            self.conv_params[Wp_str] = 1 + (self.conv_params[Wc_str] - pool_width) / Sp
         if use_batchnorm:
             gamma_str = "gamma%s" % (idx+1)
             beta_str = "beta%s" % (idx+1)
@@ -353,33 +361,33 @@ class ConvNet(object):
             self.params[beta_str] = np.zeros(num_filters)
 
     # initialize the affine layers
-    for idx_params, hidden_dim in enumerate(hidden_dims+1):  # hidden_dims = M so +1 for last affine layer
+    for idx_params in xrange(M+1):  # hidden_dims = M so +1 for last affine layer
         idx = L + 1 + idx_params + 1
-        w_str = "W%s" % (idx+1)
-        b_str = "b%s" % (idx+1)
-        if self.use_batchnorm:
-            gamma_str = "gamma%s" % (idx+1)
-            beta_str = "beta%s" % (idx+1)
+        w_str = "W%s" % (idx)
+        b_str = "b%s" % (idx)
+        if idx_params <= M-1:  # only apply batchnorm to first M layers, not including "M + 1" affine layer with softmax
+            hidden_dim = hidden_dims[idx_params]
+            if self.use_batchnorm:
+                gamma_str = "gamma%s" % (idx)
+                beta_str = "beta%s" % (idx)
         if idx_params == 0:  # first affine layer
-            self.params[w_str] = weight_scale*np.random.randn(num_filters*Hp_str*Wp_str,hidden_dim)
+            self.params[w_str] = weight_scale*np.random.randn(num_filters*self.conv_params[Hp_str]*self.conv_params[Wp_str],hidden_dim)
             self.params[b_str] = np.zeros(hidden_dim)
             if self.use_batchnorm:
                 self.params[gamma_str] = np.ones(hidden_dim)
                 self.params[beta_str] = np.zeros(hidden_dim)
-        elif idx_params == len(hidden_dims)-1:   # affine layer M
+        elif idx_params > 0 and idx_params <= len(hidden_dims)-1:   # other "M - 1" affine layers if M > 1
             prev_layer = hidden_dims[idx_params-1]
             self.params[w_str] = weight_scale*np.random.randn(prev_layer,hidden_dim)
             self.params[b_str] = np.zeros(hidden_dim)
             if self.use_batchnorm:
                 self.params[gamma_str] = np.ones(hidden_dim)
                 self.params[beta_str] = np.zeros(hidden_dim)
-        else:  # last affine layer M+1
+        else:  # last "M + 1" affine layer with softmax where there is no batchnorm
             prev_layer = hidden_dims[idx_params-1]
             self.params[w_str] = weight_scale*np.random.randn(prev_layer,num_classes)
             self.params[b_str] = np.zeros(num_classes)
-            if self.use_batchnorm:
-                self.params[gamma_str] = np.ones(num_classes)
-                self.params[beta_str] = np.zeros(num_classes)
+
 
     ############################################################################
     #                             END OF YOUR CODE                             #
@@ -422,11 +430,13 @@ class ConvNet(object):
 
     reg = self.reg
     N = X.shape[0]
+    reg_loss = 0
     use_batchnorm = self.use_batchnorm
-    cache_affine_history = []
-    cache_relu_history = []
-    cache_batchnorm_history = []
-    cache_conv_history = []
+    pool_params = self.pool_params
+    cache_affine_history = {}
+    cache_relu_history = {}
+    cache_batchnorm_history = {}
+    cache_conv_history = {}
 
     # Set train/test mode for batchnorm params since they
     # behave differently during training and testing
@@ -443,7 +453,7 @@ class ConvNet(object):
     # loop over each layer, setup initialization and compute the forward pass
     for layer_idx in xrange(self.num_layers):
         w_str, b_str = "W%s" % (layer_idx + 1), "b%s" % (layer_idx + 1)
-        wght, b = self.params['w_str'], self.params['b_str']
+        wght, b = self.params[w_str], self.params[b_str]
 
         # add the regularization loss
         reg_loss += 0.5*reg*np.sum(wght*wght)
@@ -457,36 +467,36 @@ class ConvNet(object):
         if layer_idx == 0:  # first conv layer
             layer_input = X
             if use_batchnorm:
-                out, cache = conv_batchnorm_relu_pool_forward(layer_input, wght, b, beta, gamma, bn_param, self.conv_params, pool_param)
+                out, cache = conv_batchnorm_relu_pool_forward(layer_input, wght, b, beta, gamma, bn_param, self.conv_params, pool_params)
             else:
                 out, cache = conv_relu_pool_forward(layer_input, wght, b, self.conv_params, pool_param)
-            cache_conv_history.append(cache)
+            cache_conv_history[layer_idx] = cache
         elif layer_idx > 0 and layer_idx < self.L:  # next L-1 conv layers
             layer_input = out
             if use_batchnorm:
-                out, cache = conv_batchnorm_relu_pool_forward(layer_input, wght, b, beta, gamma, bn_param, self.conv_params, pool_param)
+                out, cache = conv_batchnorm_relu_pool_forward(layer_input, wght, b, beta, gamma, bn_param, self.conv_params, pool_params)
             else:
-                out, cache = conv_relu_pool_forward(layer_input, wght, b, self.conv_params, pool_param)
-            cache_conv_history.append(cache)
+                out, cache = conv_relu_pool_forward(layer_input, wght, b, self.conv_params, pool_params)
+            cache_conv_history[layer_idx] = cache
         elif layer_idx == self.L:  # last "L+1" conv layer without max pooling
             layer_input = out
             if use_batchnorm:
                 out, cache = conv_batchnorm_relu_forward(layer_input, wght, b, beta, gamma, bn_param, self.conv_params)
             else:
                 out, cache = conv_relu_forward(layer_input, wght, b, self.conv_params)
-            cache_conv_history.append(cache)
+            cache_conv_history[layer_idx] = cache
         elif layer_idx > self.L and layer_idx < self.num_layers-1:  # first M-1 affine layers
             layer_input = out
             if use_batchnorm:
                 out, cache = affine_batchnorm_relu_forward(layer_input, wght, b, gamma, beta, bn_param)
-                cache_affine_history.append(cache)
+                cache_affine_history[layer_idx] = cache
             else:
                 out, cache = affine_relu_forward(layer_input, wght, b)
-                cache_affine_history.append(cache)
+                cache_affine_history[layer_idx] = cache
         else:  # last affine layer M; no batchnorm
             layer_input = out
             scores, cache = affine_forward(layer_input, wght, b)
-            cache_affine_history.append(cache)
+            cache_affine_history[layer_idx] = cache
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -508,7 +518,7 @@ class ConvNet(object):
     for backprop_idx in xrange(self.num_layers-1,-1,-1):
         # set strings for keys for grads dictionary values
         w_str, b_str = "W%s" % (backprop_idx+1), "b%s" % (backprop_idx+1)
-        wght = self.params['w_str']
+        wght = self.params[w_str]
         if use_batchnorm:
             gamma_str, beta_str = "gamma%s" % (backprop_idx+1), "beta%s" % (backprop_idx+1)
 
