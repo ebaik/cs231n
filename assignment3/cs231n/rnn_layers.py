@@ -139,21 +139,22 @@ def rnn_backward(dh, cache):
     ##############################################################################
     N, T, H = dh.shape
     _, D = cache[0][0].shape
+
     dx = np.zeros((N, T, D))
+    dWx = np.zeros((D, H))
+    dWh = np.zeros((H, H))
+    db = np.zeros((H))
+    dprev_h_step = np.zeros((N,H))
     for idx in range(T-1,-1,-1):
         cache_step = cache[idx]
-        dnext_h = dh[:,idx,:]
+        dnext_h = dh[:,idx,:] + dprev_h_step
         dx_step, dprev_h_step, dWx_step, dWh_step, db_step = rnn_step_backward(dnext_h, cache_step)
-        dx[:,idx,:] = dx_step  
-        if idx == T-1:
-            dWx = dWx_step
-            dWh = dWh_step
-            db = db_step
-        else:
-            dWx += dWx_step
-            dWh += dWh_step
-            db += db_step        
-    dh0 = dprev_h_step
+        dx[:,idx,:] = dx_step
+        dWx += dWx_step
+        dWh += dWh_step
+        db += db_step
+        if idx == 0:
+            dh0 = dprev_h_step
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -181,7 +182,8 @@ def word_embedding_forward(x, W):
     #                                                                            #
     # HINT: This can be done in one line using NumPy's array indexing.           #
     ##############################################################################
-    pass
+    out = W[x,:]
+    cache = (x, W)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -210,7 +212,9 @@ def word_embedding_backward(dout, cache):
     # Note that Words can appear more than once in a sequence.                   #
     # HINT: Look up the function np.add.at                                       #
     ##############################################################################
-    pass
+    x, W = cache
+    dW = np.zeros_like(W)
+    np.add.at(dW, x, dout)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
