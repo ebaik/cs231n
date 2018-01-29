@@ -137,7 +137,27 @@ class CaptioningRNN(object):
         # defined above to store loss and gradients; grads[k] should give the      #
         # gradients for self.params[k].                                            #
         ############################################################################
-        pass
+        h0, cache_af = affine_forward(features, W_proj, b_proj)
+        out_we, cache_we = word_embedding_forward(captions_in, W_embed)
+        h_rnnf, cache_rnnf = rnn_forward(out_we, h0, Wx, Wh, b)  # (N, T, H)
+        out_taf, cache_taf = temporal_affine_forward(h_rnnf, W_vocab, b_vocab)  # (N, T, V)
+        loss, dout_taf = temporal_softmax_loss(out_taf, captions_out, mask, verbose=False)
+
+        # backward pass
+        dout_tab, dW_vocab, db_vocab = temporal_affine_backward(dout_taf, cache_taf)
+        dout_rnnb, dh0, dWx, dWh, db = rnn_backward(dout_tab, cache_rnnf)
+        dW_embed = word_embedding_backward(dout_rnnb, cache_we)
+        dfeatures, dW_proj, db_proj = affine_backward(dh0, cache_af)
+
+        # save gradients from backpropagation
+        grads['W_proj'] = dW_proj
+        grads['b_proj'] = db_proj
+        grads['W_embed'] = dW_embed
+        grads['Wx'] = dWx
+        grads['Wh'] = dWh
+        grads['b'] = db
+        grads['W_vocab'] = dW_vocab
+        grads['b_vocab'] = db_vocab
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -199,7 +219,11 @@ class CaptioningRNN(object):
         # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
         # a loop.                                                                 #
         ###########################################################################
-        pass
+        h0, cache_af = affine_forward(features, W_proj, b_proj)
+        for idx_word in xrange(max_length):
+            word = captions[:,idx_word]
+            out, cache = word_embedding_forward(word, W_embed)
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
