@@ -34,6 +34,11 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # hidden state and any values you need for the backward pass in the next_h   #
     # and cache variables respectively.                                          #
     ##############################################################################
+    #print('x.shape = {}'.format(x.shape))
+    #print('Wx.shape = {}'.format(Wx.shape))
+    #print('prev_h.shape = {}'.format(prev_h.shape))
+    #print('Wh.shape = {}'.format(Wh.shape))
+    #print('b.shape = {}'.format(b.shape))  
     next_h = np.tanh(np.dot(x, Wx) + np.dot(prev_h, Wh) + b)
     cache = (x, prev_h, Wx, Wh, b, next_h)
     ##############################################################################
@@ -182,6 +187,8 @@ def word_embedding_forward(x, W):
     #                                                                            #
     # HINT: This can be done in one line using NumPy's array indexing.           #
     ##############################################################################
+    #print('W.shape = {}'.format(W.shape))
+    #print('x.shape = {}'.format(x.shape))
     out = W[x,:]
     cache = (x, W)
     ##############################################################################
