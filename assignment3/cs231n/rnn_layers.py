@@ -263,11 +263,23 @@ def lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b):
     - cache: Tuple of values needed for backward pass.
     """
     next_h, next_c, cache = None, None, None
+    N, H = prev_h.shape
     #############################################################################
     # TODO: Implement the forward pass for a single timestep of an LSTM.        #
     # You may want to use the numerically stable sigmoid implementation above.  #
     #############################################################################
-    pass
+    A = np.dot(x, Wx) + np.dot(prev_h, Wh) + b  # (N, 4H)
+    ai = A[:,0:H]
+    af = A[:,H:H+H]
+    ao = A[:,2*H:2*H+H]
+    ag = A[:,3*H:3*H+H]
+    i = sigmoid(ai)
+    f = sigmoid(af)
+    o = sigmoid(ao)
+    g = np.tanh(ag)
+    next_c = f * prev_c + i * g
+    next_h = o * np.tanh(next_c)
+    cache = (x, prev_h, next_h, prev_c, next_c, Wx, Wh, b, i, f, o, g, ai, af, ao, ag)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -292,14 +304,56 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     - dWh: Gradient of hidden-to-hidden weights, of shape (H, 4H)
     - db: Gradient of biases, of shape (4H,)
     """
-    dx, dh, dc, dWx, dWh, db = None, None, None, None, None, None
+    dx, dprev_h, dprev_c, dWx, dWh, db = None, None, None, None, None, None
+    x, prev_h, next_h, prev_c, next_c, Wx, Wh, b, i, f, o, g, ai, af, ao, ag = cache
+    N, H = dnext_h.shape
+    dA = np.zeros((N,4*H))
     #############################################################################
     # TODO: Implement the backward pass for a single timestep of an LSTM.       #
     #                                                                           #
     # HINT: For sigmoid and tanh you can compute local derivatives in terms of  #
     # the output value from the nonlinearity.                                   #
     #############################################################################
-    pass
+    dnext_c += (1 - np.tanh(next_c) * np.tanh(next_c)) * (dnext_h * o)
+    dprev_c = f * dnext_c
+
+    di = g * dnext_c  # (N, H)
+    df = prev_c * dnext_c 
+    do = np.tanh(next_c) * dnext_h 
+    dg = i * dnext_c
+    
+    dai = (1 - i) * i * di  # (N, H)
+    daf = (1 - f) * f * df
+    dao = (1 - o) * o * do
+    dag = (1 - g*g) * dg
+    
+    dA = np.concatenate((dai, daf, dao, dag), axis=1) # (N, 4H)
+
+    print('dai.shape = ',dai.shape)
+    print('daf.shape = ',daf.shape)
+    print('dao.shape = ',dao.shape)
+    print('dag.shape = ',dag.shape)
+    print('dA.shape = ',dA.shape)
+
+    dx = np.matmul(dA, Wx.T)  # (N, D) = (N, 4H) * (4H, D)
+    dWx = np.matmul(x.T, dA)  # (D, 4H) = (D, N) * (N, 4H)
+    dWh = np.matmul(prev_h.T, dA)  # (H, 4H) = (N, H).T * (N, 4H)
+    dprev_h = np.matmul(dA, Wh.T)  # (N, H) = (N, 4H) * (4H, H)
+    db = np.sum(dA, axis=0)  # (4H, )    
+
+    #dbranch2 = (1 - cout_tanh * cout_tanh) * dnext_h * o  # (N, H)
+    #difog[:,0:H] = (1 - i) * i * g * dbranch2
+    #difog[:,H:2*H] = (1 - f) * f * dprev_c * dbranch2
+    #difog[:,2*H:3*H] = (1 - o) * o * (dnext_h * cout_tanh)
+    #difog[:,3*H:4*H] = (1 - g * g) * i * dbranch2
+    #W[0:H,:] = Wh
+    #W[H:H+D,:] = Wx 
+    #dprev_h = np.matmul(difog, W[0:H,:].T)  # (N, H) = (N, 4H) * (4H, H) 
+    #dx = np.matmul(difog, W[H:H+D,:].T)  # (N, D) = (N, 4H) * (4H, D)
+    #dWx = np.matmul(x.T, difog)  # (D, 4H) = (D, N) * (N, 4H)  
+    #dWh = np.matmul(prev_h.T, difog)  # (H, 4H) = (N, H).T * (N, 4H)      
+    #db = np.sum(difog,axis=0)  # (4h,) 
+
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
