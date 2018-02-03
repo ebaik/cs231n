@@ -329,11 +329,11 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     
     dA = np.concatenate((dai, daf, dao, dag), axis=1) # (N, 4H)
 
-    print('dai.shape = ',dai.shape)
-    print('daf.shape = ',daf.shape)
-    print('dao.shape = ',dao.shape)
-    print('dag.shape = ',dag.shape)
-    print('dA.shape = ',dA.shape)
+    #print('dai.shape = ',dai.shape)
+    #print('daf.shape = ',daf.shape)
+    #print('dao.shape = ',dao.shape)
+    #print('dag.shape = ',dag.shape)
+    #print('dA.shape = ',dA.shape)
 
     dx = np.matmul(dA, Wx.T)  # (N, D) = (N, 4H) * (4H, D)
     dWx = np.matmul(x.T, dA)  # (D, 4H) = (D, N) * (N, 4H)
@@ -388,7 +388,18 @@ def lstm_forward(x, h0, Wx, Wh, b):
     # TODO: Implement the forward pass for an LSTM over an entire timeseries.   #
     # You should use the lstm_step_forward function that you just defined.      #
     #############################################################################
-    pass
+    N, T, D = x.shape
+    _, H = h0.shape
+    h = np.zeros((N,T,H))
+    cache = []
+    prev_h = h0
+    prev_c = np.zeros_like(h0)
+    for idx in range(T):
+        next_h, next_c, cache_f = lstm_step_forward(x[:,idx,:], prev_h, prev_c, Wx, Wh, b) # next_h is (N, H)
+        prev_h = next_h  # (N, H)
+        prev_c = next_c  # (N, H)
+        h[:,idx,:] = next_h
+        cache.append(cache_f)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -416,7 +427,26 @@ def lstm_backward(dh, cache):
     # TODO: Implement the backward pass for an LSTM over an entire timeseries.  #
     # You should use the lstm_step_backward function that you just defined.     #
     #############################################################################
-    pass
+    N, T, H = dh.shape
+    _, D = cache[0][0].shape
+
+    dx = np.zeros((N, T, D))
+    dWx = np.zeros((D, 4*H))
+    dWh = np.zeros((H, 4*H))
+    db = np.zeros((4*H))
+    dprev_h_step = np.zeros((N,H))
+    dprev_c_step = np.zeros((N,H))
+    for idx in reversed(range(T)):
+        cache_step = cache[idx]
+        dnext_h = dh[:,idx,:] + dprev_h_step
+        dnext_c = dprev_c_step
+        dx_step, dprev_h_step, dprev_c_step, dWx_step, dWh_step, db_step = lstm_step_backward(dnext_h, dnext_c, cache_step)
+        dx[:,idx,:] = dx_step
+        dWx += dWx_step
+        dWh += dWh_step
+        db += db_step
+        if idx == 0:
+            dh0 = dprev_h_step
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
