@@ -139,13 +139,19 @@ class CaptioningRNN(object):
         ############################################################################
         h0, cache_af = affine_forward(features, W_proj, b_proj)
         out_we, cache_we = word_embedding_forward(captions_in, W_embed)
-        h_rnnf, cache_rnnf = rnn_forward(out_we, h0, Wx, Wh, b)  # (N, T, H)
+        if self.cell_type == 'rnn':
+            h_rnnf, cache_rnnf = rnn_forward(out_we, h0, Wx, Wh, b)  # (N, T, H)
+        elif self.cell_type == 'lstm':
+            h_rnnf, cache_rnnf = lstm_forward(out_we, h0, Wx, Wh, b) # (N, T, H)
         out_taf, cache_taf = temporal_affine_forward(h_rnnf, W_vocab, b_vocab)  # (N, T, V)
         loss, dout_taf = temporal_softmax_loss(out_taf, captions_out, mask, verbose=False)
 
         # backward pass
         dout_tab, dW_vocab, db_vocab = temporal_affine_backward(dout_taf, cache_taf)
-        dout_rnnb, dh0, dWx, dWh, db = rnn_backward(dout_tab, cache_rnnf)
+        if self.cell_type == 'rnn':
+            dout_rnnb, dh0, dWx, dWh, db = rnn_backward(dout_tab, cache_rnnf)
+        elif self.cell_type == 'lstm':
+            dout_rnnb, dh0, dWx, dWh, db = lstm_backward(dout_tab, cache_rnnf)        
         dW_embed = word_embedding_backward(dout_rnnb, cache_we)
         dfeatures, dW_proj, db_proj = affine_backward(dh0, cache_af)
 
@@ -221,10 +227,15 @@ class CaptioningRNN(object):
         ###########################################################################
         h0, cache = affine_forward(features, W_proj, b_proj)  # h0 is (N, H)
         prev_h = h0
+        prev_c = np.zeros_like(prev_h)
         word_hot_next = self._start * np.ones(N, dtype=np.int32)
         for idx_word in range(max_length):
             word_embed, cache = word_embedding_forward(word_hot_next, W_embed)  # output is (N, D) where T = 1, W_embed is (V, D)
-            next_h, cache = rnn_step_forward(word_embed, prev_h, Wx, Wh, b)  # next_h is (N, H)
+            if self.cell_type == 'rnn':
+                next_h, cache = rnn_step_forward(word_embed, prev_h, Wx, Wh, b)  # next_h is (N, H)
+            elif self.cell_type == 'lstm':
+                next_h, next_c, cache = lstm_step_forward(word_embed, prev_h, prev_c, Wx, Wh, b)
+                prev_c = next_c
             y, cache = affine_forward(next_h, W_proj, b_proj)    # y is (N, H)
             i_max = np.argmax(y, axis=1)  # (N, )
             word_hot_next = i_max
