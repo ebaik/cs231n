@@ -236,7 +236,9 @@ class CaptioningRNN(object):
             elif self.cell_type == 'lstm':
                 next_h, next_c, cache = lstm_step_forward(word_embed, prev_h, prev_c, Wx, Wh, b)
                 prev_c = next_c
-            y, cache = affine_forward(next_h, W_proj, b_proj)    # y is (N, H)
+            #print('next_h.shape = ', next_h.shape)
+            #print('W_vocab.shape = ', W_vocab.shape)
+            y, cache = affine_forward(next_h, W_vocab, b_vocab)    # y is (N, H)
             i_max = np.argmax(y, axis=1)  # (N, )
             word_hot_next = i_max
             captions[:, idx_word] = i_max
